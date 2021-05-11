@@ -30,7 +30,7 @@ setup(
         "usaddress"
     ],
     packages=find_packages(),
-    package_data={"censuscoding": ["VERSION"]},
+    package_data={"censuscoding": ["VERSION", "state_codes.json", "file_hashes.json"]},
     entry_points={
         "console_scripts": [
             "censuscoding = censuscoding.__main__:main"
