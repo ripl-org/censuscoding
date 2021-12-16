@@ -9,8 +9,18 @@ import numpy as np
 import pandas as pd
 import usaddress
 from importlib import resources
+from pkg_resources import resource_stream
 
 __version__ = resources.read_text(__name__, "VERSION").strip()
+
+def load_street_data():
+    """
+    Loads street names and street numbers datasets.
+    """
+    
+    name_stream = resource_stream(__name__, "data/blkgrp-zip-street-names.csv")
+    num_stream = resource_stream(__name__, "data/blkgrp-zip-street-nums.csv")
+    return [pd.read_csv(name_stream), pd.read_csv(num_stream)]
 
 
 class Log(object):
@@ -47,9 +57,11 @@ def split_address(address):
 
 
 def censuscode(
-    in_file, out_file,
-    lookup_streets, lookup_nums, geo_level="blkgrp",
-    record_id="record_id", zip_code="zip_code", address="address", street="street", street_num="street_num"
+    in_file, 
+    out_file,
+    record_id="record_id",
+    zip_code="zip_code", 
+    address="address"
 ):
     """
     Determine the Census blockgroup for a street address,
@@ -69,14 +81,15 @@ def censuscode(
     info("Parsing street name and number from address field")
     parsed = pd.DataFrame(addresses[address].str.upper().str.extract("([0-9A-Z ]+)", expand=False).fillna("").apply(split_address).tolist())
     if "StreetNamePreDirectional" in parsed.columns:
-        addresses[street] = np.where(parsed.StreetNamePreDirectional.notnull(), parsed.StreetNamePreDirectional + " " + parsed.StreetName, parsed.StreetName)
+        addresses["street"] = np.where(parsed.StreetNamePreDirectional.notnull(), parsed.StreetNamePreDirectional + " " + parsed.StreetName, parsed.StreetName)
     else:
-        addresses[street] = parsed.StreetName
-    addresses[street_num] = np.where(parsed.AddressNumber.str.isdigit(), parsed.AddressNumber, np.nan)
+        addresses["street"] = parsed.StreetName
+    addresses["street_num"] = np.where(parsed.AddressNumber.str.isdigit(), parsed.AddressNumber, np.nan)
 
     with open(out_file + ".log", "w") as log:
 
         info("Loading lookup files")
+        lookup_streets, lookup_nums = load_street_data()
         streets = lookup_streets.drop_duplicates(["street", "zip"])
         print(len(streets), "distinct street names", file=log)
         nums = lookup_nums.drop_duplicates(["street_num", "street", "zip"])
@@ -86,7 +99,7 @@ def censuscode(
         num_lookup = {}
         for index, group in nums.groupby(["street", "zip"]):
             group = group.sort_values("street_num")
-            num_lookup[index] = (group["street_num"].values, group[geo_level].values)
+            num_lookup[index] = (group["street_num"].values, group["blkgrp"].values)
         print(len(num_lookup), "look-ups for street number ranges", file=log)
 
         info("Filtering records with non-missing zip codes")
@@ -104,59 +117,59 @@ def censuscode(
         print(N[-1], "records with valid integer zip codes", file=log)
 
         info("Filtering records with valid street names")
-        addresses[street] = addresses[street].str.upper().str.extract("([0-9A-Z ]+)", expand=False)
-        addresses = addresses[addresses[street].notnull()]
+        addresses["street"] = addresses["street"].str.upper().str.extract("([0-9A-Z ]+)", expand=False)
+        addresses = addresses[addresses["street"].notnull()]
         N.append(len(addresses))
         print(N[-1], "records with valid street names", file=log)
 
         info("Merge 1 on distinct street name")
         addresses = addresses.merge(streets,
                                     how="left",
-                                    left_on=[street, zip_code],
+                                    left_on=["street", zip_code],
                                     right_on=["street", "zip"],
                                     validate="many_to_one")
         assert len(addresses) == N[-1]
-        merged = addresses[geo_level].notnull()
-        addresses.loc[merged, [record_id, zip_code, geo_level]].to_csv(out_file, float_format="%.0f", index=False)
+        merged = addresses["blkgrp"].notnull()
+        addresses.loc[merged, [record_id, zip_code, "blkgrp"]].to_csv(out_file, float_format="%.0f", index=False)
         print("merged", merged.sum(), "records on distinct street name", file=log)
 
         # Remove merged addresses.
         addresses = addresses[~merged]
-        del addresses[geo_level]
+        del addresses["blkgrp"]
         N.append(len(addresses))
         print(N[-1], "records remaining", file=log)
 
         # Keep records with valid integer street nums.
-        if addresses[street_num].dtype == "O":
-            addresses[street_num] = addresses[street_num].str.extract("(\d+)", expand=False)
-        addresses = addresses[addresses[street_num].notnull()]
-        addresses[street_num] = addresses[street_num].astype(int)
+        if addresses["street_num"].dtype == "O":
+            addresses["street_num"] = addresses["street_num"].str.extract("(\d+)", expand=False)
+        addresses = addresses[addresses["street_num"].notnull()]
+        addresses["street_num"] = addresses["street_num"].astype(int)
         N.append(len(addresses))
         print(N[-1], "records with valid integer street nums", file=log)
 
         info("Merge 2 on distinct street name/num")
         addresses = addresses.merge(nums,
                                     how="left",
-                                    left_on=[street_num, street, zip_code],
+                                    left_on=["street_num", "street", zip_code],
                                     right_on=["street_num", "street", "zip"],
                                     validate="many_to_one")
         assert len(addresses) == N[-1]
-        merged = addresses[geo_level].notnull()
-        addresses.loc[merged, [record_id, zip_code, geo_level]].to_csv(out_file, float_format="%.0f", index=False, mode="a", header=False)
+        merged = addresses["blkgrp"].notnull()
+        addresses.loc[merged, [record_id, zip_code, "blkgrp"]].to_csv(out_file, float_format="%.0f", index=False, mode="a", header=False)
         print("merged", merged.sum(), "records on distinct street name/num", file=log)
 
         # Remove merged addresses.
         addresses = addresses[~merged]
-        del addresses[geo_level]
+        del addresses["blkgrp"]
         N.append(len(addresses))
         print(N[-1], "records remaining", file=log)
 
         info("Merge 3 with street number range search")
         merged = []
         for _, row in addresses.iterrows():
-            l = num_lookup.get((row[street], row[zip_code]))
+            l = num_lookup.get((row["street"], row[zip_code]))
             if l is not None:
-                i = np.searchsorted(l[0], row[street_num], side="right")
+                i = np.searchsorted(l[0], row["street_num"], side="right")
                 merged.append((row[record_id], row[zip_code], l[1][max(0, i-1)]))
         print("merged", len(merged), "records on nearest street name/num", file=log)
         with open(out_file, "a") as f:
