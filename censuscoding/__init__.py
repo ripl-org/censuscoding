@@ -9,8 +9,17 @@ import numpy as np
 import pandas as pd
 import usaddress
 from importlib import resources
+from pkg_resources import resource_stream
 
 __version__ = resources.read_text(__name__, "VERSION").strip()
+
+def load_street_data():
+    """
+    Loads street names and street numbers datasets.
+    """
+    name_stream = resource_stream(__name__, "data/blkgrp-zip-street-names.csv")
+    num_stream = resource_stream(__name__, "data/blkgrp-zip-street-nums.csv")
+    return [pd.read_csv(name_stream), pd.read_csv(num_stream)]
 
 
 class Log(object):
