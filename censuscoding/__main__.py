@@ -26,12 +26,6 @@ def main():
     parser.add_argument("-o", "--output",
                         required=True,
                         help="output CSV file containing [record_id, zip_code, blkgrp]")
-    parser.add_argument("--lookup_streets",
-                        required=True,
-                        help="input CSV file containing the street-level lookup table")
-    parser.add_argument("--lookup_nums",
-                        required=True,
-                        help="input CSV file containing the street-number-level lookup table")
 
     # Optional arguments
     parser.add_argument("--record_id",
@@ -54,15 +48,10 @@ def main():
         logging.basicConfig(level=logging.INFO)
 
     info = censuscoding.Log(__name__, "main").info
-    info("Loading lookup files")
-    lookup_streets = pd.read_csv(args.lookup_streets, low_memory=False)
-    lookup_nums = pd.read_csv(args.lookup_nums, low_memory=False)
 
     censuscoding.censuscode(
         args.input,
         args.output,
-        lookup_streets,
-        lookup_nums,
         record_id=args.record_id,
         zip_code=args.zip_code,
         address=args.address
