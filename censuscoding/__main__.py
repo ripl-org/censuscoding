@@ -22,7 +22,7 @@ def main():
     # Required arguments
     parser.add_argument("-i", "--input",
                         required=True,
-                        help="input CSV file containing [record_id, zip_code, street, street_num]")
+                        help="input CSV file containing [record_id, zip_code, address]")
     parser.add_argument("-o", "--output",
                         required=True,
                         help="output CSV file containing [record_id, zip_code, blkgrp]")

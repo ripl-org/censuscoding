@@ -8,8 +8,8 @@ with open("censuscoding/VERSION") as f:
 
 setup(
     name="censuscoding",
-    author=["Mark Howison", "Daniel Molitor"],
-    author_email=["mhowison@ripl.org", "dmolitor@ripl.org"],
+    author="Mark Howison",
+    author_email="mhowison@ripl.org",
     version=version,
     url="https://github.com/ripl-org/censuscoding",
     description="Censuscoding: determine the Census blockgroup for a street address",
