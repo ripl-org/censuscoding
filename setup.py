@@ -31,6 +31,7 @@ setup(
     ],
     packages=find_packages(),
     package_data={"censuscoding": ["VERSION", "data"]},
+    python_requires=">=3.7,<3.10",
     entry_points={
         "console_scripts": [
             "censuscoding = censuscoding.__main__:main"

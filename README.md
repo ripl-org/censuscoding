@@ -26,5 +26,5 @@ There is a single command line script included, `censuscoding`.
 * `--address` - field name corresponding to the street address with street name and number (default: 'address')
 
 ## Authors
-* Mark Howison
-* Daniel Molitor
+* [Mark Howison](https://mark.howison.org/)
+* [Daniel Molitor](https://dmolitor.github.io)
