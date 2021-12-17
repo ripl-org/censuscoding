@@ -1,5 +1,9 @@
 # censuscoding
 
+<!-- badges: start -->
+![](https://github.com/ripl-org/censuscoding/actions/workflows/censuscoding.yml/badge.svg)
+<!-- badges: end -->
+
 `censuscoding` is a self-contained tool for determining the Census 
 blockgroup for a street address. It is developed by
 [Research Improving People's Lives (RIPL)](https://ripl.org).
