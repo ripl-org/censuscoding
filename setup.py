@@ -30,7 +30,7 @@ setup(
         "usaddress"
     ],
     packages=find_packages(),
-    package_data={"censuscoding": ["VERSION", "data"]},
+    package_data={"censuscoding": ["VERSION", "data/*.csv"]},
     python_requires=">=3.7,<3.10",
     entry_points={
         "console_scripts": [
