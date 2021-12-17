@@ -14,7 +14,7 @@ Due to outstanding bugs in dependencies introduced in Python 3.10.0,
 `censuscoding` requires Python >=3.7 and <3.10.
 
 To install from PyPI using **pip**:  
-`pip install sirad`
+`pip install censuscoding`
 
 To install a **development version** from the current directory:  
 `pip install -e .`
