@@ -26,12 +26,11 @@ setup(
     ],
     provides=["censuscoding"],
     install_requires=[
-        "pandas",
         "usaddress"
     ],
     packages=find_packages(),
-    package_data={"censuscoding": ["VERSION", "data/*.csv"]},
-    python_requires=">=3.7,<3.10",
+    package_data={"censuscoding": ["VERSION", "data/*"]},
+    python_requires=">=3.7",
     entry_points={
         "console_scripts": [
             "censuscoding = censuscoding.__main__:main"

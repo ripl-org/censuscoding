@@ -35,19 +35,25 @@ There is a single command line script included, `censuscoding`.
 
 ## License
 
-`censuscoding` is freely available for non-commercial use under the license provided in [LICENSE](https://github.com/ripl-org/censuscoding/blob/main/LICENSE).
+To `censuscoding` is freely available for non-commercial use under the license provided in [LICENSE](https://github.com/ripl-org/censuscoding/blob/main/LICENSE).
 To inquiry about commercial use, please contact [connect@ripl.org](mailto:connect@ripl.org).
+
+The derived data packaged with `censuscoding` is covered under this license, however PLEASE CAREFULLY READ THE DATA SECTION BELOW FOR IMPORTANT INFORMATION ON THE COMPLEX LICENSING OF THE MANY ORIGINAL DATA SOURCES USED TO DERIVE THIS DATA.
 
 ## Data
 
-Data included in the `censuscoding` package were derived from the following sources:
+Data included in the `censuscoding` package are derived from combining the US Census Bureau's TIGER/Line shapefiles version [2020](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.2020.html) at the block group level with a large collection of address point data from state and county governments across the US, which are indexed by the [OpenAddresses](https://openaddresses.io/) open data project.
 
-### Rhode Island Geographic Information System E911 Site/Structure Address Points
+The TIGER/Line data are in the public domain. **The address point data are licensed under many different terms and conditions**, which are summarized in the [SOURCES](https://github.com/ripl-org/censuscoding-data/blob/main/SOURCES.md) file in the `censuscoding-data` repository.
 
-Version [e911Sites21r1](https://www.arcgis.com/sharing/rest/content/items/2d9f7e30ef904317b29f735723127c94/info/metadata/metadata.xml?format=default&output=html).
+We acknowledge the following government agencies who have published the address point data that are critical to the development of this project:
 
-> These data are designed and maintained for RI E 9-1-1 mapping software. They are not intended for any other purpose. This dataset is provided 'as is.’ The producer(s) of this dataset, contributors to this dataset, the Rhode Island Geographic Information System (RIGIS) consortium, the State of Rhode Island, and the University of Rhode Island do not make any warranties of any kind for this dataset, and are not liable for any loss or damage however and whenever caused by any use of this dataset. Please acknowledge both RIGIS and the primary producer(s) of this dataset in any derived products. Versions of the RIGIS logo suitable for both printed and web-based products are available at https://www.rigis.org.
+**State Offices**
+* [Colorado Governor's Office of Information Technology](https://oit.colorado.gov/)
+* [Maine Office of GIS](https://www.maine.gov/megis/)
+* [Massachusetts Bureau of Geographic Information (MassGIS)](https://www.mass.gov/orgs/massgis-bureau-of-geographic-information)
+* [New Jersey Office of GIS](https://njgin.nj.gov/njgin/about/ogis)
+* [Rhode Island Geographic Information System](https://www.rigis.org)
 
-### US Census Bureau TIGER/Line Shapefiles
-
-Version [2020](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.2020.html).
+**County/Municipal Offices**
+* [Honolulu Land Information System (HoLIS)](https://www.honolulugis.org/)

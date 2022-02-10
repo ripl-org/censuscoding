@@ -1,7 +1,6 @@
 import argparse
 import censuscoding
 import logging
-import pandas as pd
 import sys
 
 def main():

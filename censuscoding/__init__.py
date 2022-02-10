@@ -4,23 +4,21 @@ Censuscoding: determine the Census blockgroup for a street address
 https://github.com/ripl-org/censuscoding
 """
 
+import csv
 import logging
-import numpy as np
-import pandas as pd
-import usaddress
+import os
+import pickle
+import re
+import sys
+
+from address import extract_address
+from bisect import bisect_left
 from importlib import resources
 from pkg_resources import resource_stream
 
 __version__ = resources.read_text(__name__, "VERSION").strip()
-
-def load_street_data():
-    """
-    Loads street names and street numbers datasets.
-    """
-    
-    name_stream = resource_stream(__name__, "data/blkgrp-zip-street-names.csv")
-    num_stream = resource_stream(__name__, "data/blkgrp-zip-street-nums.csv")
-    return [pd.read_csv(name_stream), pd.read_csv(num_stream)]
+_nondigit = re.compile(r"[^0-9]")
+_lookups = {}
 
 
 class Log(object):
@@ -45,15 +43,16 @@ class Log(object):
         self.log.warn(" {}".format(sep.join(map(str, message))))
 
 
-def split_address(address):
+def load_lookup(zip2):
     """
-    Run usaddress tag method on full street address field to
-    split it into street name and number.
+    Lazy loading of lookup files by first 2 digits of zip code.
     """
-    try:
-        return usaddress.tag(address)[0]
-    except usaddress.RepeatedLabelError:
-        return usaddress.tag("")[0]
+    global _lookups
+    if zip2 not in _lookups:
+        log = Log(__name__, "load_lookup")
+        log.info(f"loading {zip2}")
+        _lookups[zip2] = pickle.load(resource_stream(__name__, f"data/{zip2}"))
+    return _lookups[zip2]
 
 
 def censuscode(
@@ -68,115 +67,85 @@ def censuscode(
     based on zip code, street name, and street number.
     """
 
-    info = Log(__name__, "censuscode").info
-    info("Censuscoding", in_file)
+    log = Log(__name__, "censuscode")
+    log.info("Censuscoding", in_file)
 
-    addresses = pd.read_csv(
-        in_file,
-        low_memory=False,
-        usecols=[record_id, zip_code, address]
-    )
-    N = [len(addresses)]
+    if not os.path.exists(in_file):
+        log.error(f"file {in_file} does not exist!")
+        sys.exit(-1)
 
-    info("Parsing street name and number from address field")
-    parsed = pd.DataFrame(addresses[address].str.upper().str.extract("([0-9A-Z ]+)", expand=False).fillna("").apply(split_address).tolist())
-    if "StreetNamePreDirectional" in parsed.columns:
-        addresses["street"] = np.where(parsed.StreetNamePreDirectional.notnull(), parsed.StreetNamePreDirectional + " " + parsed.StreetName, parsed.StreetName)
-    else:
-        addresses["street"] = parsed.StreetName
-    addresses["street_num"] = np.where(parsed.AddressNumber.str.isdigit(), parsed.AddressNumber, np.nan)
+    stats = {
+        "valid_zip": 0,
+        "valid_street": 0,
+        "valid_street_num": 0,
+        "match_street": 0,
+        "match_street_num": 0
+    }
 
-    with open(out_file + ".log", "w") as log:
+    with open(in_file) as fin:
+        reader = csv.DictReader(fin)
+        with open(out_file, "w") as fout:
+            writer = csv.writer(fout)
+            writer.writerow((record_id, "zip_code", "blkgrp"))
+            for n, record in enumerate(reader, start=1):
+                # Validate record
+                if record_id not in record:
+                    log.error(f"record {n} is missing record_id field '{record_id}'")
+                    sys.exit(-1)
+                if zip_code not in record:
+                    log.error(f"record {n} is missing zip_code field '{zip_code}'")
+                    sys.exit(-1)
+                if address not in record:
+                    log.error(f"record {n} is missing address field '{address}'")
+                    sys.exit(-1)
+                # Validate zip code
+                if _nondigit.search(record[zip_code]) is not None:
+                    log.debug(f"record {n} has invalid zip code '{record[zip_code]}'")
+                    continue # Zip code is required
+                else:
+                    stats["valid_zip"] += 1
+                # Extract street name and number from address
+                street_num, street = extract_address(address)
+                if not street:
+                    log.debug(f"record {n} is missing street name")
+                    continue # Street name is required
+                else:
+                    stats["valid_street"] += 1
+                if not street_num:
+                    log.debug(f"record {n} is missing street number")
+                    # Street number is not required, if there is a match on street name
+                else:
+                    stats["valid_street_num"] += 1
+                # Lookup block group
+                zip5 = record[zip_code].zfill(5)
+                zip2 = zip5[:2]
+                zip3 = zip5[2:]
+                lookup = load_lookup(zip2)
+                if zip3 in lookup:
+                    if street in lookup[zip3]:
+                        result = lookup[zip3][street]
+                        if isinstance(result, str):
+                            # Match on street name
+                            writer.writerow((record[record_id], zip5, result))
+                            stats["match_street"] += 1
+                        elif street_num:
+                            # Binary search in street_num range
+                            nums = result[0]
+                            blkgrps = result[1]
+                            i = bisect_left(nums, street_num)
+                            if i > 0 or (i == 0 and nums[0] == street_num):
+                                writer.writerow((record[record_id], zip5, blkgrps[i]))
+                                stats["match_street_num"] += 1
+                        else:
+                            log.debug(f"record {n} has lookup but is missing street_num")
 
-        info("Loading lookup files")
-        lookup_streets, lookup_nums = load_street_data()
-        streets = lookup_streets.drop_duplicates(["street", "zip"])
-        print(len(streets), "distinct street names", file=log)
-        nums = lookup_nums.drop_duplicates(["street_num", "street", "zip"])
-        print(len(nums), "distinct street name/numbers", file=log)
-
-        info("Building range look-up for street nums")
-        num_lookup = {}
-        for index, group in nums.groupby(["street", "zip"]):
-            group = group.sort_values("street_num")
-            num_lookup[index] = (group["street_num"].values, group["blkgrp"].values)
-        print(len(num_lookup), "look-ups for street number ranges", file=log)
-
-        info("Filtering records with non-missing zip codes")
-        addresses = addresses[addresses[zip_code].notnull()]
-        N.append(len(addresses))
-        print(N[-1], "records with non-missing zip codes", file=log)
-
-        info("Filtering records with valid integer zip codes")
-        if addresses[zip_code].dtype == "O":
-            addresses[zip_code] = addresses[zip_code].str.extract("(\d+)", expand=False)
-            addresses = addresses[addresses[zip_code].notnull()]
-        addresses[zip_code] = addresses[zip_code].astype(int)
-        addresses = addresses[addresses[zip_code].isin(streets.zip.unique())]
-        N.append(len(addresses))
-        print(N[-1], "records with valid integer zip codes", file=log)
-
-        info("Filtering records with valid street names")
-        addresses["street"] = addresses["street"].str.upper().str.extract("([0-9A-Z ]+)", expand=False)
-        addresses = addresses[addresses["street"].notnull()]
-        N.append(len(addresses))
-        print(N[-1], "records with valid street names", file=log)
-
-        info("Merge 1 on distinct street name")
-        addresses = addresses.merge(streets,
-                                    how="left",
-                                    left_on=["street", zip_code],
-                                    right_on=["street", "zip"],
-                                    validate="many_to_one")
-        assert len(addresses) == N[-1]
-        merged = addresses["blkgrp"].notnull()
-        addresses.loc[merged, [record_id, zip_code, "blkgrp"]].to_csv(out_file, float_format="%.0f", index=False)
-        print("merged", merged.sum(), "records on distinct street name", file=log)
-
-        # Remove merged addresses.
-        addresses = addresses[~merged]
-        del addresses["blkgrp"]
-        N.append(len(addresses))
-        print(N[-1], "records remaining", file=log)
-
-        # Keep records with valid integer street nums.
-        if addresses["street_num"].dtype == "O":
-            addresses["street_num"] = addresses["street_num"].str.extract("(\d+)", expand=False)
-        addresses = addresses[addresses["street_num"].notnull()]
-        addresses["street_num"] = addresses["street_num"].astype(int)
-        N.append(len(addresses))
-        print(N[-1], "records with valid integer street nums", file=log)
-
-        info("Merge 2 on distinct street name/num")
-        addresses = addresses.merge(nums,
-                                    how="left",
-                                    left_on=["street_num", "street", zip_code],
-                                    right_on=["street_num", "street", "zip"],
-                                    validate="many_to_one")
-        assert len(addresses) == N[-1]
-        merged = addresses["blkgrp"].notnull()
-        addresses.loc[merged, [record_id, zip_code, "blkgrp"]].to_csv(out_file, float_format="%.0f", index=False, mode="a", header=False)
-        print("merged", merged.sum(), "records on distinct street name/num", file=log)
-
-        # Remove merged addresses.
-        addresses = addresses[~merged]
-        del addresses["blkgrp"]
-        N.append(len(addresses))
-        print(N[-1], "records remaining", file=log)
-
-        info("Merge 3 with street number range search")
-        merged = []
-        for _, row in addresses.iterrows():
-            l = num_lookup.get((row["street"], row[zip_code]))
-            if l is not None:
-                i = np.searchsorted(l[0], row["street_num"], side="right")
-                merged.append((row[record_id], row[zip_code], l[1][max(0, i-1)]))
-        print("merged", len(merged), "records on nearest street name/num", file=log)
-        with open(out_file, "a") as f:
-            for row in merged:
-                print(*row, sep=",", file=f)
-        N.append(N[-1] - len(merged))
-        print(N[-1], "records remain unmerged", file=log)
-        print("overall match rate: {:.1f}%".format(100.0 * (N[0] - (N[0] - N[2]) - N[-1]) / N[0]), file=log)
-
-    info("Done.")
+    # Print summary stats
+    percent = lambda x: (100.0 * x) / n
+    log.info("processed {:d} records:".format(i))
+    log.info("  {:,d} ({:.1f}%) with valid zip code".format(stats["valid_zip"], percent(stats["valid_zip"])))
+    log.info("  {:,d} ({:.1f}%) with normalized street name".format(stats["valid_street"], percent(stats["valid_street"])))
+    log.info("  {:,d} ({:.1f}%) with normalized street number".format(stats["valid_street_num"], percent(stats["valid_street_num"])))
+    log.info("  {:,d} ({:.1f}%) matched on street name".format(stats["match_street"], percent(stats["match_street"])))
+    log.info("  {:,d} ({:.1f}%) matched on street number".format(stats["match_street_num"], percent(stats["match_street_num"])))
+    log.info("overall match rate: {:.1f}%".format(percent(stats["match_street"] + stats["match_street_num"])))
+    log.info("Done.")
