@@ -1,7 +1,7 @@
 import re
 import usaddress
-from censuscoding import Log
-log = Log(__name__)
+from censuscoding import log
+
 
 # Translation table for transliteration of non-ASCII
 # letters to ASCII.
@@ -123,17 +123,18 @@ def _clean(address):
         return address
 
 
-def _tag(address):
+def tag(address):
     """
-    Tag address with usaddress
+    Clean and tag address with usaddress
     """
+    address = _clean(address)
     try:
         tags = usaddress.tag(address)
     except:
-        log.warn(f"cannot tag address {address}")
+        log.warn(f"address '{address}' cannot be tagged")
         return None
     if len(tags) < 1:
-        log.warn(f"empty tags for address {address}")
+        log.warn(f"address '{address}' has empty tags")
         return None
     else:
         return tags
@@ -144,19 +145,16 @@ def normalize_directional(directional):
     """
     normalized = _directionals.get(directional.upper(), None)
     if normalized is None:
-        log.warn(f"bad directional '{directional}'")
+        log.warn(f"has bad directional '{directional}'")
         return ""
     else:
         return normalized
 
 
-def normalize_street(address):
+def normalize_street(tags):
     """
-    Tag address with usaddress and interpret tags to determine
-    a normalized street name.
+    Determine a normalized street name from address tags.
     """
-    tags = _tag(_clean(address))
-    # Interpret tags to determine street name
     if tags is not None:
         tags = tags[0]
         if "StreetName" in tags and "StreetNamePreDirectional" in tags:
@@ -178,22 +176,19 @@ def normalize_street(address):
         elif "StreetNamePostDirectional" in tags:
             return tags["StreetNamePostDirectional"]
         else:
-            log.warn(f"missing street name for address '{address}'")
-    return ""
+            log.warn(f"is missing street")
 
 
-def extract_street_num(address):
+def normalize_street_num(tags):
     """
-    Tag address with usaddress and return street num
+    Determine a numeric street number from address tags.
     """
-    tags = _tag(_clean(address))
     if tags is not None:
         tags = tags[0]
         if "AddressNumber" in tags:
             return tags["AddressNumber"]
         else:
-            log.warn(f"missing street num for address '{address}'")
-    return ""
+            log.warn(f"is missing street num")
 
 
 def transliterate(name):
