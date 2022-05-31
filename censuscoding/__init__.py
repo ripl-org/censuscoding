@@ -20,6 +20,7 @@ __version__ = resources.read_text(__name__, "VERSION").strip()
 _nondigit = re.compile(r"[^0-9]")
 _pobox = re.compile("box|p ?o ?box|p ?o ?bx")
 _unsheltered = re.compile("unshelt|shelt|no shelt|no perm|npa|homeless|transient")
+_digit = re.compile(r"[0-9]")
 _lookups = {}
 
 
@@ -70,7 +71,7 @@ def load_lookup(zip2):
     return _lookups[zip2]
 
 
-def validate(record, record_id, zip_code, address, stats):
+def validate(record, n, record_id, zip_code, address, stats):
     """
     Validate that the record has all required fields and that
     the zip code is numeric.
@@ -90,8 +91,8 @@ def normalize_zip_code(zip_code, stats):
     """
     Ensure that zip code is 5 digits and 0 padded
     """
-    if _nondigit.search(record[zip_code]) is not None or len(record[zip_code] > 5):
-        log.debug(f"has invalid zip code '{record[zip_code]}'")
+    if _nondigit.search(zip_code) is not None or len(zip_code) > 5:
+        log.debug(f"has invalid zip code '{zip_code}'")
         return False
     else:
         stats["valid_zip"] += 1
@@ -99,7 +100,7 @@ def normalize_zip_code(zip_code, stats):
     return zip_code.zfill(5)
 
 
-def match_special_cases(address, writer, record_id, zip, stats):
+def match_special_cases(address, writer, record_id, zip_code, stats):
     """
     Match special cases of non-codable addresses,
     such as PO boxes or unsheltered notes.
@@ -107,12 +108,12 @@ def match_special_cases(address, writer, record_id, zip, stats):
     address_lower = address.lower()
     if _pobox.match(address_lower) is not None:
         log.debug(f"address '{address}' is PO box")
-        writer.writerow(record_id, zip5, "", "1", "0")
+        writer.writerow(record_id, zip_code, "", "1", "0")
         stats["match_pobox"] += 1
         return True
-    elif _unsheltered.amtch(address_lower) is not None:
+    elif _unsheltered.match(address_lower) is not None and _digit.match(address_lower) is None:
         log.debug(f"address '{address}' is unsheltered")
-        writer.writerow(record_id, zip5, "", "0", "1")
+        writer.writerow(record_id, zip_code, "", "0", "1")
         stats["match_unsheltered"] += 1
         return True
     else:
@@ -165,42 +166,42 @@ def censuscode(
         for n, record in enumerate(reader, start=1):
             # Prefix log entries for this record
             log.set_prefix(f"record {n}")
-            validate(record, record_id, zip_code, address)
+            validate(record, n, record_id, zip_code, address, stats)
             zip5 = normalize_zip_code(record[zip_code], stats)
-            if match_special_cases(record[address], wrtier, record[record_id], zip5, stats):
+            if match_special_cases(record[address], writer, record[record_id], zip5, stats):
                continue # Special cases cannot be censuscoded to a block group
             street_num, street = extract_address(record[address])
-                if not street:
-                    log.debug(f"record {n} is missing street name")
-                    continue # Street name is required
-                else:
-                    stats["valid_street"] += 1
-                if not street_num:
-                    log.debug(f"record {n} is missing street number")
-                    # Street number is not required, if there is a match on street name
-                else:
-                    stats["valid_street_num"] += 1
-                # Lookup block group
-                zip2 = zip5[:2]
-                zip3 = zip5[2:]
-                lookup = load_lookup(zip2)
-                if zip3 in lookup:
-                    if street in lookup[zip3]:
-                        result = lookup[zip3][street]
-                        if isinstance(result, str):
-                            # Match on street name
-                            writer.writerow((record[record_id], zip5, result))
-                            stats["match_street"] += 1
-                        elif street_num:
-                            # Binary search in street_num range
-                            nums = result[0]
-                            blkgrps = result[1]
-                            i = bisect_left(nums, street_num)
-                            if i > 0 or (i == 0 and nums[0] == street_num):
-                                writer.writerow((record[record_id], zip5, blkgrps[i]))
-                                stats["match_street_num"] += 1
-                        else:
-                            log.debug("has lookup but is missing street_num")
+            if not street:
+                log.debug(f"record {n} is missing street name")
+                continue # Street name is required
+            else:
+                stats["valid_street"] += 1
+            if not street_num:
+                log.debug(f"record {n} is missing street number")
+                # Street number is not required, if there is a match on street name
+            else:
+                stats["valid_street_num"] += 1
+            # Lookup block group
+            zip2 = zip5[:2]
+            zip3 = zip5[2:]
+            lookup = load_lookup(zip2)
+            if zip3 in lookup:
+                if street in lookup[zip3]:
+                    result = lookup[zip3][street]
+                    if isinstance(result, str):
+                        # Match on street name
+                        writer.writerow((record[record_id], zip5, result))
+                        stats["match_street"] += 1
+                    elif street_num:
+                        # Binary search in street_num range
+                        nums = result[0]
+                        blkgrps = result[1]
+                        i = bisect_left(nums, street_num)
+                        if i > 0 or (i == 0 and nums[0] == street_num):
+                            writer.writerow((record[record_id], zip5, blkgrps[i]))
+                            stats["match_street_num"] += 1
+                    else:
+                        log.debug("has lookup but is missing street_num")
 
     # Print summary stats
     log.set_prefix("")
