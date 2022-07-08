@@ -1,6 +1,7 @@
 import re
 import usaddress
-from censuscoding import log
+
+from .log import log
 
 
 # Translation table for transliteration of non-ASCII

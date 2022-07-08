@@ -40,13 +40,11 @@ def main():
     args = parser.parse_args()
 
     if args.debug:
-        logging.basicConfig(level=logging.DEBUG)
+        logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
     elif args.quiet:
-        logging.basicConfig(level=logging.ERROR)
+        logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
     else:
-        logging.basicConfig(level=logging.INFO)
-
-    info = censuscoding.Log(__name__, "main").info
+        logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     censuscoding.censuscode(
         args.input,
