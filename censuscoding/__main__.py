@@ -20,6 +20,8 @@ def main():
     parser.add_argument("-p", "--preserve",
                         action="store_true",
                         help="preserve unmatched records in CSV output file")
+    parser.add_argument("--data",
+                        help="path to an alternative censuscoding data directory")
 
     # Required arguments
     parser.add_argument("-i", "--input",
@@ -48,6 +50,9 @@ def main():
         logging.basicConfig(stream=sys.stdout, level=logging.ERROR)
     else:
         logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+    if args.data:
+        censuscoding.set_lookup_path(args.data)
 
     censuscoding.censuscode(
         args.input,

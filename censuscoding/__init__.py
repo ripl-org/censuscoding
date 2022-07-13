@@ -26,6 +26,15 @@ _lookup_path = os.getenv("CENSUSCODING_DATA")
 _lookups = {}
 
 
+def set_lookup_path(path):
+    """
+    Set an alternative path to the directory containing the lookup files
+    (e.g. for testing or comparing lookups).
+    """
+    global _lookup_path
+    _lookup_path = os.path.abspath(path)
+
+
 def load_lookup(zip2):
     """
     Lazy loading of lookup files by first 2 digits of zip code.
