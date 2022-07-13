@@ -17,22 +17,25 @@ def main():
     parser.add_argument("-d", "--debug",
                         action="store_true",
                         help="show all logging messages, including debugging output")
+    parser.add_argument("-p", "--preserve",
+                        action="store_true",
+                        help="preserve unmatched records in CSV output file")
 
     # Required arguments
     parser.add_argument("-i", "--input",
                         required=True,
-                        help="input CSV file containing [record_id, zip_code, address]")
+                        help="input CSV file containing [record_id, zipcode, address]")
     parser.add_argument("-o", "--output",
                         required=True,
-                        help="output CSV file containing [record_id, zip_code, blkgrp]")
+                        help="output CSV file containing ['id', 'zipcode', 'blkgrp', 'pobox', 'unsheltered']")
 
     # Optional arguments
     parser.add_argument("--record_id",
                         default="record_id",
                         help="field name corresponding to the record ID [default: 'record_id']")
-    parser.add_argument("--zip_code",
-                        default="zip_code",
-                        help="field name corresponding to the zip code [default: 'zip_code']")
+    parser.add_argument("--zipcode",
+                        default="zipcode",
+                        help="field name corresponding to the zip code [default: 'zipcode']")
     parser.add_argument("--address",
                         default="address",
                         help="field name corresponding to the street address with street name and number [default: 'address']")
@@ -50,8 +53,9 @@ def main():
         args.input,
         args.output,
         record_id=args.record_id,
-        zip_code=args.zip_code,
-        address=args.address
+        zipcode=args.zipcode,
+        address=args.address,
+        preserve=args.preserve
     )
 
 if __name__ == "__main__":
