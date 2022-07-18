@@ -17,9 +17,12 @@ def main():
     parser.add_argument("-d", "--debug",
                         action="store_true",
                         help="show all logging messages, including debugging output")
-    parser.add_argument("-p", "--preserve",
+    parser.add_argument("--preserve-rows",
                         action="store_true",
-                        help="preserve unmatched records in CSV output file")
+                        help="preserve all rows, including unmatched records, in CSV output file")
+    parser.add_argument("--preserve-cols",
+                        nargs="*",
+                        help="preserve the specified columns in CSV output file")
     parser.add_argument("--data",
                         help="path to an alternative censuscoding data directory")
 
@@ -60,7 +63,8 @@ def main():
         record_id=args.record_id,
         zipcode=args.zipcode,
         address=args.address,
-        preserve=args.preserve
+        preserve_rows=args.preserve_rows,
+        preserve_cols=args.preserve_cols
     )
 
 if __name__ == "__main__":

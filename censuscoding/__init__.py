@@ -15,7 +15,6 @@ from .log import log
 
 from bisect import bisect_left
 from importlib import resources
-from pkg_resources import resource_stream
 
 __version__ = resources.read_text(__name__, "VERSION").strip()
 _nondigit = re.compile(r"[^0-9]")
@@ -43,10 +42,15 @@ def load_lookup(zip2):
     if zip2 not in _lookups:
         log.info(f"loading lookup {zip2}")
         if _lookup_path:
-            with open(f"{_lookup_path}/{zip2}", "rb") as f:
+            zip2_path = os.path.join(_lookup_path, zip2)
+        else:
+            with resources.path(__name__, os.path.join("data", zip2)) as p:
+                zip2_path = p
+        if os.path.exists(zip2_path):
+            with open(zip2_path, "rb") as f:
                 _lookups[zip2] = pickle.load(f)
         else:
-            _lookups[zip2] = pickle.load(resource_stream(__name__, f"data/{zip2}"))
+            _lookups[zip2] = {}
     return _lookups[zip2]
 
 
@@ -188,7 +192,8 @@ def censuscode(
     record_id="record_id",
     zipcode="zipcode", 
     address="address",
-    preserve=False
+    preserve_rows=False,
+    preserve_cols=[]
 ):
     """
     Determine the Census blockgroup for a street address,
@@ -224,19 +229,19 @@ def censuscode(
 
         # CSV writer
         writer = csv.writer(fout)
-        header = ["id", "zipcode", "blkgrp", "pobox", "unsheltered"]
+        header = ["id", "zipcode", "blkgrp", "pobox", "unsheltered"] + preserve_cols
         writer.writerow(header)
 
         # Match records
         for n, record in enumerate(reader, start=1):
-            match = match_record(
+            record.update(match_record(
                 record.get(record_id, ""),
                 record.get(zipcode, ""),
                 record.get(address, ""),
                 stats
-            )
-            if match or preserve:
-                writer.writerow([match.get(field, "") for field in header])
+            ))
+            if record.get("blkgrp") or preserve_rows:
+                writer.writerow([record.get(field, "") for field in header])
 
     # Print summary
     log.set_prefix("")
