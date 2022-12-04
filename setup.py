@@ -12,7 +12,7 @@ setup(
     author_email="mhowison@ripl.org",
     version=version,
     url="https://github.com/ripl-org/censuscoding",
-    description="Censuscoding: determine the Census blockgroup for a street address",
+    description="Censuscoding, a privacy-preserving alternative to geocoding",
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
@@ -21,7 +21,7 @@ setup(
         "Intended Audience :: Science/Research",
         "Natural Language :: English",
         "Operating System :: POSIX :: Linux",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3",
         "Topic :: Scientific/Engineering"
     ],
     provides=["censuscoding"],
@@ -30,7 +30,7 @@ setup(
     ],
     packages=find_packages(),
     package_data={"censuscoding": ["VERSION", "data/*"]},
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     entry_points={
         "console_scripts": [
             "censuscoding = censuscoding.__main__:main"

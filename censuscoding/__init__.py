@@ -1,57 +1,28 @@
 """
-Censuscoding: determine the Census blockgroup for a street address
+Censuscoding, a privacy-preserving alternative to geocoding
 
 https://github.com/ripl-org/censuscoding
 """
 
 import csv
 import os
-import pickle
 import re
 import sys
-
-from .address import tag, normalize_street_num, normalize_street
-from .log import log
-
 from bisect import bisect_left
 from importlib import resources
 
+from censuscoding.address import tag, normalize_street_num, normalize_street
+from censuscoding.log import log
+from censuscoding.data import set_lookup_path, load_lookup
+
+
 __version__ = resources.read_text(__name__, "VERSION").strip()
+
 _nondigit = re.compile(r"[^0-9]")
 _pobox = re.compile("box|p ?o ?box|p ?o ?bx")
 _unsheltered = re.compile("unshelt|no shelt|no perm|npa|homeless|transient")
 _digit = re.compile(r"[0-9]")
-_lookup_path = os.getenv("CENSUSCODING_DATA")
-_lookups = {}
-
-
-def set_lookup_path(path):
-    """
-    Set an alternative path to the directory containing the lookup files
-    (e.g. for testing or comparing lookups).
-    """
-    global _lookup_path
-    _lookup_path = os.path.abspath(path)
-
-
-def load_lookup(zip2):
-    """
-    Lazy loading of lookup files by first 2 digits of zip code.
-    """
-    global _lookups
-    if zip2 not in _lookups:
-        log.info(f"loading lookup {zip2}")
-        if _lookup_path:
-            zip2_path = os.path.join(_lookup_path, zip2)
-        else:
-            with resources.path(__name__, os.path.join("data", zip2)) as p:
-                zip2_path = p
-        if os.path.exists(zip2_path):
-            with open(zip2_path, "rb") as f:
-                _lookups[zip2] = pickle.load(f)
-        else:
-            _lookups[zip2] = {}
-    return _lookups[zip2]
+_streetnum = re.compile(r"^([1-9][0-9]*)")
 
 
 def validate_header(header, record_id, zipcode, address):
@@ -59,10 +30,10 @@ def validate_header(header, record_id, zipcode, address):
     Validate that the input file has all required fields in the header.
     """
     if record_id not in header:
-        log.error(f"input file is missing record_id field '{record_id}'")
+        log.error(f"input file is missing record ID field '{record_id}'")
         sys.exit(1)
     if zipcode not in header:
-        log.error(f"input file is missing zip_code field '{zipcode}'")
+        log.error(f"input file is missing zip code field '{zipcode}'")
         sys.exit(1)
     if address not in header:
         log.error(f"input file is missing address field '{address}'")
@@ -122,12 +93,16 @@ def match_record(record_id, zipcode, address, stats):
         return match # Special cases cannot be censuscoded to a block group
     streetnum, street = extract_address(address)
     if not street:
-        log.debug(f"record {record_id} is missing street name")
+        log.debug(f"is missing street name")
         return match # Street name is required
     else:
         stats["valid_street"] += 1
+    # Extract integer street number
+    streetnum = _streetnum.match(streetnum)
+    if streetnum is not None:
+        streetnum = int(streetnum.group(1))
     if not streetnum:
-        log.debug(f"record {record_id} is missing street number")
+        log.debug(f"is missing street number")
         # Street number is not required, if there is a match on street name
     else:
         stats["valid_streetnum"] += 1
@@ -142,11 +117,6 @@ def match_record(record_id, zipcode, address, stats):
                 match["blkgrp"] = result
                 stats["match_street"] += 1
             elif streetnum:
-                try:
-                    streetnum = int(streetnum)
-                except:
-                    log.debug(f"record {record_id} has non-numeric street number")
-                    return match
                 # Binary search in streetnum range
                 nums = result[0]
                 blkgrps = result[1]
@@ -199,11 +169,7 @@ def censuscode(
     Determine the Census blockgroup for a street address,
     based on zip code, street name, and street number.
     """
-    global _lookup_path
-
-    if _lookup_path:
-        _lookup_path = os.path.abspath(_lookup_path)
-        log.info(f"using lookup files from", _lookup_path)
+    set_lookup_path()
 
     log.info("censuscoding", in_file)
 
@@ -229,7 +195,9 @@ def censuscode(
 
         # CSV writer
         writer = csv.writer(fout)
-        header = ["id", "zipcode", "blkgrp", "pobox", "unsheltered"] + preserve_cols
+        header = ["id", "zipcode", "blkgrp", "pobox", "unsheltered"]
+        if preserve_cols:
+            header += preserve_cols
         writer.writerow(header)
 
         # Match records
@@ -244,6 +212,5 @@ def censuscode(
                 writer.writerow([record.get(field, "") for field in header])
 
     # Print summary
-    log.set_prefix("")
     print_summary(n, stats)
     log.info("Done.")

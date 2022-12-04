@@ -21,19 +21,19 @@ class Log(object):
 
     def error(self, *message, sep=" "):
         if self.prefix:
-            self.log.error(" {} {}".format(self.prefix, sep.join(map(str, message))))
+            self.log.error(" {}".format(sep.join(map(str, message))))
         else:
             self.log.error(" {}".format(sep.join(map(str, message))))
 
     def info(self, *message, sep=" "):
         if self.prefix:
-            self.log.info(" {} {}".format(self.prefix, sep.join(map(str, message))))
+            self.log.info(" {}".format(sep.join(map(str, message))))
         else:
             self.log.info(" {}".format(sep.join(map(str, message))))
 
     def warn(self, *message, sep=" "):
         if self.prefix:
-            self.log.warn(" {} {}".format(self.prefix, sep.join(map(str, message))))
+            self.log.warn(" {}".format(sep.join(map(str, message))))
         else:
             self.log.warn(" {}".format(sep.join(map(str, message))))
 
